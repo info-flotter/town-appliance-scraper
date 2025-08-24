@@ -9,9 +9,9 @@ def scrape_product(url):
         response = requests.get(url)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        title = soup.find('h1')
-        price = soup.find('div', class_='price')
-        image = soup.find('img', class_='main-image')
+        title = soup.find('h1', class_='page-title')
+price = soup.find('div', class_='price-final')
+image = soup.find('img', class_='gallery-placeholder__image')
 
         return {
             "url": url,
