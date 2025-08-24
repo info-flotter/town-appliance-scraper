@@ -4,47 +4,38 @@ from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-@app.route("/", methods=["POST"])
+def scrape_product(url):
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        title = soup.find('h1')
+        price = soup.find('div', class_='price')
+        image = soup.find('img', class_='main-image')
+
+        return {
+            "url": url,
+            "title": title.get_text(strip=True) if title else None,
+            "price": price.get_text(strip=True) if price else None,
+            "image": image['src'] if image and image.has_attr('src') else None
+        }
+    except Exception as e:
+        return {
+            "url": url,
+            "error": str(e)
+        }
+
+@app.route('/scrape', methods=['POST'])
 def scrape():
-    data = request.json
-    brand = data.get("brand")
-    product_type = data.get("product_type")
+    data = request.get_json()
+    urls = data.get('urls', [])
 
-    query_parts = []
-    if brand:
-        query_parts.append(brand)
-    if product_type:
-        query_parts.append(product_type)
+    if not isinstance(urls, list):
+        return jsonify({"error": "Invalid input. Expected 'urls' as a list."}), 400
 
-    query = "+".join(query_parts) or "appliance"
-    search_url = f"https://www.ajmadison.com/search.do?query={query}"
-    res = requests.get(search_url)
-    soup = BeautifulSoup(res.text, 'html.parser')
+    results = [scrape_product(url) for url in urls]
+    return jsonify(results)
 
-    products = []
-    cards = soup.select("div.product-tile-wrapper")
-
-    for card in cards[:6]:
-        name_el = card.select_one("div.product-title a")
-        price_el = card.select_one("span.sales")
-        was_el = card.select_one("span.was")
-
-        if not name_el:
-            continue
-
-        name = name_el.get_text(strip=True)
-        url = "https://www.ajmadison.com" + name_el.get('href')
-        price = price_el.get_text(strip=True) if price_el else None
-        was = was_el.get_text(strip=True) if was_el else None
-
-        products.append({
-            "product_name": name,
-            "competitor_url": url,
-            "price": price,
-            "was_price": was,
-        })
-
-    return jsonify(products)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+@app.route('/')
+def home():
+    return 'Scraper is running!'
